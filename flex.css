@@ -1,0 +1,69 @@
+.carte{
+    margin:auto;
+    position:fixed;
+    right: 0px;
+    left: 0px;
+    height: 550px;
+    width: 400px;
+    background-image: url(carte-cover.jpg);
+    background-size: cover;
+    border: 3px;
+    border-style: solid;
+    border-color: black;
+    position: absolute;
+    left:0px;
+    right: 0px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+}
+.buttons{
+    height: 30px;
+    width: 120px;
+    display: flex;
+    align-self: center;
+    justify-content: space-between;
+
+}
+
+.imgg{
+    display: flex;
+    justify-content: center;
+}
+.imgg img{
+    border-radius: 15%;
+    max-height: 400px;
+    width: auto;
+    width: auto;
+}
+
+.dislike-button{
+    border-radius: 15px;
+    background-color: gray;
+}
+
+.like-button{
+    width: 50PX;
+    border-radius: 15px;
+    background-color: red;
+}
+.title{
+    align-self: center;
+    font-size: 30px;
+    color: brown;
+}
+#show-disliked{
+    align-self: center;
+    width: 100px;
+    background-color: lightsteelblue;     
+}
+#show-liked{
+    background-color: deeppink;
+    align-self: center;
+    width: 100px;
+}
+#body{
+    background-image: url(carte-cover.jpg);
+    background-repeat: no-repeat;
+    background-size: cover;
+}
