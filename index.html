@@ -10,8 +10,17 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-        .swipe-active { transition: transform 0.3s ease-out; }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        .swipe-right {
+            transform: translateX(100%);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        .swipe-left {
+            transform: translateX(-100%);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
         .modal-enter { animation: modalEnter 0.3s ease-out; }
         @keyframes modalEnter {
             from { opacity: 0; transform: scale(0.95); }
@@ -23,16 +32,16 @@
     <div class="bg-white shadow-2xl rounded-2xl border border-gray-200 max-w-2xl w-full mx-4 overflow-hidden fade-in">
         <!-- Header -->
         <header class="bg-white/80 backdrop-blur-sm border-b border-gray-200 p-4 flex justify-between items-center">
-            <button class="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-all flex items-center gap-2"
-                id="show-disliked">
+            <button class="relative bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-all flex items-center gap-2" id="show-disliked">
                 👎 Disliked
+                <span class="absolute -top-2 -right-2 bg-blue-500 text-white text-xs rounded-full px-2 py-1" id="disliked-count">0</span>
             </button>
             <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">
                 Fashion Curator
             </h1>
-            <button class="bg-pink-100 hover:bg-pink-200 px-4 py-2 rounded-lg transition-all flex items-center gap-2"
-                id="show-liked">
+            <button class="relative bg-pink-100 hover:bg-pink-200 px-4 py-2 rounded-lg transition-all flex items-center gap-2" id="show-liked">
                 ❤️ Liked
+                <span class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-2 py-1" id="liked-count">0</span>
             </button>
         </header>
 
@@ -41,7 +50,7 @@
             <div id="main-content" class="relative group">
                 <div class="relative aspect-square rounded-xl overflow-hidden shadow-lg">
                     <img src="outfit3.jpg" alt="Current outfit" 
-                         class="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 swipe-active"
+                         class="absolute inset-0 w-full h-full object-cover transition-opacity duration-300"
                          id="current-img">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end p-4">
                         <div class="text-white">
@@ -54,11 +63,15 @@
 
                 <!-- Controls -->
                 <div class="flex justify-center gap-4 mt-6">
-                    <button id="dislike-btn" 
+                    <button id="dislike-btn" aria-label="Dislike this outfit" 
                             class="p-3 rounded-full bg-white shadow-lg hover:shadow-xl hover:bg-gray-100 transition-all">
                         ❌ Dislike
                     </button>
-                    <button id="like-btn" 
+                    <button id="undo-btn" aria-label="Undo last action" 
+                            class="p-3 rounded-full bg-white shadow-lg hover:shadow-xl hover:bg-yellow-100 transition-all disabled:opacity-50" disabled>
+                        ↩️ Undo
+                    </button>
+                    <button id="like-btn" aria-label="Like this outfit" 
                             class="p-3 rounded-full bg-white shadow-lg hover:shadow-xl hover:bg-pink-100 transition-all">
                         ❤️ Like
                     </button>
@@ -90,8 +103,7 @@
 
         <!-- Back Button -->
         <div class="hidden p-4" id="back-button-container">
-            <button class="text-gray-600 hover:text-gray-800 flex items-center gap-2 transition-colors"
-                    id="back-button">
+            <button class="text-gray-600 hover:text-gray-800 flex items-center gap-2 transition-colors" id="back-button">
                 ← Back to Browsing
             </button>
         </div>
@@ -101,9 +113,8 @@
     <div id="image-modal" class="hidden fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
         <div class="relative max-w-4xl w-full modal-enter">
             <img src="" alt="Enlarged view" class="rounded-xl shadow-2xl">
-            <button class="absolute -top-8 right-0 text-white text-4xl hover:text-gray-200 transition-colors"
-                    id="close-modal">
-                &times;
+            <button class="absolute -top-8 right-0 text-white text-4xl hover:text-gray-200 transition-colors" id="close-modal">
+                ×
             </button>
         </div>
     </div>
@@ -117,6 +128,7 @@
                 ];
                 this.liked = JSON.parse(localStorage.getItem('fashionCuratorLiked')) || [];
                 this.disliked = JSON.parse(localStorage.getItem('fashionCuratorDisliked')) || [];
+                this.actionStack = [];
                 this.currentIndex = 0;
                 this.touchStartX = 0;
                 this.touchStartY = 0;
@@ -125,6 +137,8 @@
                 this.initElements();
                 this.initEventListeners();
                 this.showCurrentImage();
+                this.updateCounts();
+                this.updateUndoButton();
             }
 
             initElements() {
@@ -139,32 +153,34 @@
                     noMoreOutfits: document.getElementById('no-more-outfits'),
                     backButton: document.getElementById('back-button'),
                     modal: document.getElementById('image-modal'),
-                    modalImage: document.querySelector('#image-modal img')
+                    modalImage: document.querySelector('#image-modal img'),
+                    likedCount: document.getElementById('liked-count'),
+                    dislikedCount: document.getElementById('disliked-count')
                 };
             }
 
             initEventListeners() {
                 document.getElementById('like-btn').addEventListener('click', () => this.handleLike());
                 document.getElementById('dislike-btn').addEventListener('click', () => this.handleDislike());
+                document.getElementById('undo-btn').addEventListener('click', () => this.undoLastAction());
                 document.getElementById('show-liked').addEventListener('click', () => this.showGallery('liked'));
                 document.getElementById('show-disliked').addEventListener('click', () => this.showGallery('disliked'));
                 document.getElementById('back-button').addEventListener('click', () => this.showMainContent());
                 document.getElementById('restart-browsing').addEventListener('click', () => this.restartBrowsing());
                 document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
-                
+
                 // Touch events
                 this.elements.currentImg.addEventListener('touchstart', e => this.handleTouchStart(e));
                 this.elements.currentImg.addEventListener('touchmove', e => this.handleTouchMove(e));
                 this.elements.currentImg.addEventListener('touchend', e => this.handleTouchEnd(e));
-                
+
                 // Mouse events
                 let mouseIsDown = false;
                 let startX = 0;
-                
+
                 this.elements.currentImg.addEventListener('mousedown', e => {
                     mouseIsDown = true;
                     startX = e.clientX;
-                    this.elements.currentImg.classList.add('swipe-active');
                 });
 
                 window.addEventListener('mousemove', e => {
@@ -176,14 +192,19 @@
                 window.addEventListener('mouseup', e => {
                     if (!mouseIsDown) return;
                     mouseIsDown = false;
-                    
                     const deltaX = e.clientX - startX;
-                    this.elements.currentImg.classList.remove('swipe-active');
                     this.elements.currentImg.style.transform = '';
-
                     if (Math.abs(deltaX) > this.swipeThreshold) {
                         deltaX > 0 ? this.handleLike() : this.handleDislike();
                     }
+                });
+
+                // Keyboard navigation
+                document.addEventListener('keydown', e => {
+                    if (this.elements.mainContent.classList.contains('hidden')) return;
+                    if (e.key === 'ArrowRight') this.handleLike();
+                    else if (e.key === 'ArrowLeft') this.handleDislike();
+                    else if (e.key === 'ArrowUp' || e.key === 'Backspace') this.undoLastAction();
                 });
 
                 // Image click for modal
@@ -191,50 +212,98 @@
                     this.openModal(this.images[this.currentIndex]));
             }
 
-            handleLike() {
-                if (!this.liked.includes(this.images[this.currentIndex])) {
-                    this.liked.push(this.images[this.currentIndex]);
+            async handleLike() {
+                await this.animateOut('right');
+                const currentOutfit = this.images[this.currentIndex];
+                if (!this.liked.includes(currentOutfit)) {
+                    this.liked.push(currentOutfit);
+                    this.actionStack.push({ action: 'like', outfit: currentOutfit });
                     this.saveToLocalStorage();
                 }
-                this.nextImage('right');
-            }
-
-            handleDislike() {
-                if (!this.disliked.includes(this.images[this.currentIndex])) {
-                    this.disliked.push(this.images[this.currentIndex]);
-                    this.saveToLocalStorage();
-                }
-                this.nextImage('left');
-            }
-
-            nextImage(direction) {
                 this.currentIndex++;
                 if (this.currentIndex < this.images.length) {
-                    this.animateSwipe(direction);
-                    setTimeout(() => this.showCurrentImage(), 300);
+                    this.showCurrentImage();
                 } else {
                     this.showNoMoreOutfits();
                 }
+                this.updateCounts();
+                this.updateUndoButton();
             }
 
-            animateSwipe(direction) {
-                this.elements.currentImg.style.transform = 
-                    `translateX(${direction === 'right' ? 100 : -100}%)`;
-                setTimeout(() => {
-                    this.elements.currentImg.style.transform = '';
-                }, 300);
+            async handleDislike() {
+                await this.animateOut('left');
+                const currentOutfit = this.images[this.currentIndex];
+                if (!this.disliked.includes(currentOutfit)) {
+                    this.disliked.push(currentOutfit);
+                    this.actionStack.push({ action: 'dislike', outfit: currentOutfit });
+                    this.saveToLocalStorage();
+                }
+                this.currentIndex++;
+                if (this.currentIndex < this.images.length) {
+                    this.showCurrentImage();
+                } else {
+                    this.showNoMoreOutfits();
+                }
+                this.updateCounts();
+                this.updateUndoButton();
+            }
+
+            undoLastAction() {
+                if (this.actionStack.length === 0) return;
+                const lastAction = this.actionStack.pop();
+                if (lastAction.action === 'like') {
+                    this.liked = this.liked.filter(outfit => outfit !== lastAction.outfit);
+                } else {
+                    this.disliked = this.disliked.filter(outfit => outfit !== lastAction.outfit);
+                }
+                const index = this.images.indexOf(lastAction.outfit);
+                if (index !== -1) {
+                    this.currentIndex = index;
+                    this.showMainContent();
+                    this.showCurrentImage();
+                }
+                this.saveToLocalStorage();
+                this.updateCounts();
+                this.updateUndoButton();
+            }
+
+            animateOut(direction) {
+                return new Promise(resolve => {
+                    this.elements.currentImg.classList.add(`swipe-${direction}`);
+                    setTimeout(() => {
+                        this.elements.currentImg.classList.remove(`swipe-${direction}`);
+                        resolve();
+                    }, 300);
+                });
             }
 
             showCurrentImage() {
+                const spinner = document.createElement('div');
+                spinner.className = 'absolute inset-0 flex items-center justify-center';
+                spinner.innerHTML = '<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>';
+                this.elements.currentImg.parentElement.appendChild(spinner);
+
+                this.elements.currentImg.onload = () => {
+                    spinner.remove();
+                    this.elements.currentImg.alt = 'Current outfit';
+                };
                 this.elements.currentImg.src = this.images[this.currentIndex];
-                this.elements.progress.textContent = 
-                    `Outfit ${this.currentIndex + 1}/${this.images.length}`;
+                this.elements.currentImg.alt = 'Loading...';
+
+                this.elements.progress.textContent = `Outfit ${this.currentIndex + 1}/${this.images.length}`;
+                this.preloadNextImage();
+            }
+
+            preloadNextImage() {
+                if (this.currentIndex + 1 < this.images.length) {
+                    const img = new Image();
+                    img.src = this.images[this.currentIndex + 1];
+                }
             }
 
             handleTouchStart(e) {
                 this.touchStartX = e.touches[0].clientX;
                 this.touchStartY = e.touches[0].clientY;
-                this.elements.currentImg.classList.add('swipe-active');
             }
 
             handleTouchMove(e) {
@@ -242,11 +311,9 @@
                 const touch = e.touches[0];
                 const deltaX = touch.clientX - this.touchStartX;
                 const deltaY = touch.clientY - this.touchStartY;
-                
                 if (Math.abs(deltaX) > Math.abs(deltaY)) {
                     e.preventDefault();
                 }
-                
                 this.elements.currentImg.style.transform = `translateX(${deltaX}px)`;
             }
 
@@ -254,14 +321,10 @@
                 const touch = e.changedTouches[0];
                 const deltaX = touch.clientX - this.touchStartX;
                 const deltaY = touch.clientY - this.touchStartY;
-                
-                this.elements.currentImg.classList.remove('swipe-active');
                 this.elements.currentImg.style.transform = '';
-
                 if (Math.abs(deltaX) > this.swipeThreshold && Math.abs(deltaY) < 100) {
                     deltaX > 0 ? this.handleLike() : this.handleDislike();
                 }
-
                 this.touchStartX = 0;
                 this.touchStartY = 0;
             }
@@ -312,18 +375,32 @@
             }
 
             restartBrowsing() {
-                this.currentIndex = 0;
-                this.liked = [];
-                this.disliked = [];
-                localStorage.clear();
-                this.showMainContent();
-                this.showCurrentImage();
-                this.updateGallery('liked');
-                this.updateGallery('disliked');
+                if (confirm('Are you sure you want to reset all your choices?')) {
+                    this.currentIndex = 0;
+                    this.liked = [];
+                    this.disliked = [];
+                    this.actionStack = [];
+                    localStorage.clear();
+                    this.showMainContent();
+                    this.showCurrentImage();
+                    this.updateGallery('liked');
+                    this.updateGallery('disliked');
+                    this.updateCounts();
+                    this.updateUndoButton();
+                }
+            }
+
+            updateCounts() {
+                this.elements.likedCount.textContent = this.liked.length;
+                this.elements.dislikedCount.textContent = this.disliked.length;
+            }
+
+            updateUndoButton() {
+                const undoBtn = document.getElementById('undo-btn');
+                undoBtn.disabled = this.actionStack.length === 0;
             }
         }
 
-        // Initialize the curator
         const curator = new FashionCurator();
     </script>
 </body>
