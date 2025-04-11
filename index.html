@@ -3,21 +3,328 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="flex.css">
-    <title>Document</title>
+    <title>Fashion Curator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        .swipe-active { transition: transform 0.3s ease-out; }
+        .modal-enter { animation: modalEnter 0.3s ease-out; }
+        @keyframes modalEnter {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
 </head>
-<body id="body">
-    <div class="carte">
-        <button id="show-disliked">Show-Disliked</button>
-        <div class="title">Outfits library</div>
-        <button id="show-liked" >Show-liked</button>
+<body class="bg-gradient-to-br from-pink-50 to-blue-50 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white shadow-2xl rounded-2xl border border-gray-200 max-w-2xl w-full mx-4 overflow-hidden fade-in">
+        <!-- Header -->
+        <header class="bg-white/80 backdrop-blur-sm border-b border-gray-200 p-4 flex justify-between items-center">
+            <button class="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-all flex items-center gap-2"
+                id="show-disliked">
+                👎 Disliked
+            </button>
+            <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">
+                Fashion Curator
+            </h1>
+            <button class="bg-pink-100 hover:bg-pink-200 px-4 py-2 rounded-lg transition-all flex items-center gap-2"
+                id="show-liked">
+                ❤️ Liked
+            </button>
+        </header>
 
-        <div class="imgg" id="imggg"><img src="outfit1.jpg" alt="y" id="img"></div>
-        <div class="buttons">
-            <button class="dislike-button" id="Dislike">Dislike</button>
-            <button class="like-button" id="like">like</button>
+        <!-- Main Content -->
+        <main class="p-6">
+            <div id="main-content" class="relative group">
+                <div class="relative aspect-square rounded-xl overflow-hidden shadow-lg">
+                    <img src="outfit3.jpg" alt="Current outfit" 
+                         class="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 swipe-active"
+                         id="current-img">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end p-4">
+                        <div class="text-white">
+                            <p id="progress" class="font-medium text-sm mb-1">Outfit 1/9</p>
+                            <h2 class="text-xl font-bold">Stylish Look</h2>
+                            <p class="text-sm opacity-90">Curated Collection</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex justify-center gap-4 mt-6">
+                    <button id="dislike-btn" 
+                            class="p-3 rounded-full bg-white shadow-lg hover:shadow-xl hover:bg-gray-100 transition-all">
+                        ❌ Dislike
+                    </button>
+                    <button id="like-btn" 
+                            class="p-3 rounded-full bg-white shadow-lg hover:shadow-xl hover:bg-pink-100 transition-all">
+                        ❤️ Like
+                    </button>
+                </div>
+            </div>
+
+            <!-- Galleries -->
+            <div id="liked-gallery" class="hidden">
+                <h2 class="text-2xl font-bold mb-4 text-gray-800">Loved Outfits ❤️</h2>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="liked-container"></div>
+            </div>
+
+            <div id="disliked-gallery" class="hidden">
+                <h2 class="text-2xl font-bold mb-4 text-gray-800">Disliked Outfits 👎</h2>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="disliked-container"></div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="no-more-outfits" class="hidden text-center py-12">
+                <div class="text-4xl mb-4">🎉</div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-2">All Done!</h3>
+                <p class="text-gray-600 mb-6">You've reviewed all available outfits.</p>
+                <button id="restart-browsing" 
+                        class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg transition-colors">
+                    Start Over
+                </button>
+            </div>
+        </main>
+
+        <!-- Back Button -->
+        <div class="hidden p-4" id="back-button-container">
+            <button class="text-gray-600 hover:text-gray-800 flex items-center gap-2 transition-colors"
+                    id="back-button">
+                ← Back to Browsing
+            </button>
         </div>
     </div>
-    <script src="flex.js"></script>
+
+    <!-- Modal -->
+    <div id="image-modal" class="hidden fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
+        <div class="relative max-w-4xl w-full modal-enter">
+            <img src="" alt="Enlarged view" class="rounded-xl shadow-2xl">
+            <button class="absolute -top-8 right-0 text-white text-4xl hover:text-gray-200 transition-colors"
+                    id="close-modal">
+                &times;
+            </button>
+        </div>
+    </div>
+
+    <script>
+        class FashionCurator {
+            constructor() {
+                this.images = [
+                    'outfit3.jpg', 'outfit2.jpg', 'outfit4.jpg', 'outfit5.jpg',
+                    'outfit6.jpg', 'outfit7.jpg', 'outfit8.jpg', 'outfit9.jpg', 'outfit10.jpg'
+                ];
+                this.liked = JSON.parse(localStorage.getItem('fashionCuratorLiked')) || [];
+                this.disliked = JSON.parse(localStorage.getItem('fashionCuratorDisliked')) || [];
+                this.currentIndex = 0;
+                this.touchStartX = 0;
+                this.touchStartY = 0;
+                this.swipeThreshold = 50;
+
+                this.initElements();
+                this.initEventListeners();
+                this.showCurrentImage();
+            }
+
+            initElements() {
+                this.elements = {
+                    currentImg: document.getElementById('current-img'),
+                    progress: document.getElementById('progress'),
+                    mainContent: document.getElementById('main-content'),
+                    likedGallery: document.getElementById('liked-gallery'),
+                    dislikedGallery: document.getElementById('disliked-gallery'),
+                    likedContainer: document.getElementById('liked-container'),
+                    dislikedContainer: document.getElementById('disliked-container'),
+                    noMoreOutfits: document.getElementById('no-more-outfits'),
+                    backButton: document.getElementById('back-button'),
+                    modal: document.getElementById('image-modal'),
+                    modalImage: document.querySelector('#image-modal img')
+                };
+            }
+
+            initEventListeners() {
+                document.getElementById('like-btn').addEventListener('click', () => this.handleLike());
+                document.getElementById('dislike-btn').addEventListener('click', () => this.handleDislike());
+                document.getElementById('show-liked').addEventListener('click', () => this.showGallery('liked'));
+                document.getElementById('show-disliked').addEventListener('click', () => this.showGallery('disliked'));
+                document.getElementById('back-button').addEventListener('click', () => this.showMainContent());
+                document.getElementById('restart-browsing').addEventListener('click', () => this.restartBrowsing());
+                document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
+                
+                // Touch events
+                this.elements.currentImg.addEventListener('touchstart', e => this.handleTouchStart(e));
+                this.elements.currentImg.addEventListener('touchmove', e => this.handleTouchMove(e));
+                this.elements.currentImg.addEventListener('touchend', e => this.handleTouchEnd(e));
+                
+                // Mouse events
+                let mouseIsDown = false;
+                let startX = 0;
+                
+                this.elements.currentImg.addEventListener('mousedown', e => {
+                    mouseIsDown = true;
+                    startX = e.clientX;
+                    this.elements.currentImg.classList.add('swipe-active');
+                });
+
+                window.addEventListener('mousemove', e => {
+                    if (!mouseIsDown) return;
+                    const deltaX = e.clientX - startX;
+                    this.elements.currentImg.style.transform = `translateX(${deltaX}px)`;
+                });
+
+                window.addEventListener('mouseup', e => {
+                    if (!mouseIsDown) return;
+                    mouseIsDown = false;
+                    
+                    const deltaX = e.clientX - startX;
+                    this.elements.currentImg.classList.remove('swipe-active');
+                    this.elements.currentImg.style.transform = '';
+
+                    if (Math.abs(deltaX) > this.swipeThreshold) {
+                        deltaX > 0 ? this.handleLike() : this.handleDislike();
+                    }
+                });
+
+                // Image click for modal
+                this.elements.currentImg.addEventListener('click', () => 
+                    this.openModal(this.images[this.currentIndex]));
+            }
+
+            handleLike() {
+                if (!this.liked.includes(this.images[this.currentIndex])) {
+                    this.liked.push(this.images[this.currentIndex]);
+                    this.saveToLocalStorage();
+                }
+                this.nextImage('right');
+            }
+
+            handleDislike() {
+                if (!this.disliked.includes(this.images[this.currentIndex])) {
+                    this.disliked.push(this.images[this.currentIndex]);
+                    this.saveToLocalStorage();
+                }
+                this.nextImage('left');
+            }
+
+            nextImage(direction) {
+                this.currentIndex++;
+                if (this.currentIndex < this.images.length) {
+                    this.animateSwipe(direction);
+                    setTimeout(() => this.showCurrentImage(), 300);
+                } else {
+                    this.showNoMoreOutfits();
+                }
+            }
+
+            animateSwipe(direction) {
+                this.elements.currentImg.style.transform = 
+                    `translateX(${direction === 'right' ? 100 : -100}%)`;
+                setTimeout(() => {
+                    this.elements.currentImg.style.transform = '';
+                }, 300);
+            }
+
+            showCurrentImage() {
+                this.elements.currentImg.src = this.images[this.currentIndex];
+                this.elements.progress.textContent = 
+                    `Outfit ${this.currentIndex + 1}/${this.images.length}`;
+            }
+
+            handleTouchStart(e) {
+                this.touchStartX = e.touches[0].clientX;
+                this.touchStartY = e.touches[0].clientY;
+                this.elements.currentImg.classList.add('swipe-active');
+            }
+
+            handleTouchMove(e) {
+                if (!this.touchStartX) return;
+                const touch = e.touches[0];
+                const deltaX = touch.clientX - this.touchStartX;
+                const deltaY = touch.clientY - this.touchStartY;
+                
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    e.preventDefault();
+                }
+                
+                this.elements.currentImg.style.transform = `translateX(${deltaX}px)`;
+            }
+
+            handleTouchEnd(e) {
+                const touch = e.changedTouches[0];
+                const deltaX = touch.clientX - this.touchStartX;
+                const deltaY = touch.clientY - this.touchStartY;
+                
+                this.elements.currentImg.classList.remove('swipe-active');
+                this.elements.currentImg.style.transform = '';
+
+                if (Math.abs(deltaX) > this.swipeThreshold && Math.abs(deltaY) < 100) {
+                    deltaX > 0 ? this.handleLike() : this.handleDislike();
+                }
+
+                this.touchStartX = 0;
+                this.touchStartY = 0;
+            }
+
+            showGallery(type) {
+                this.elements.mainContent.classList.add('hidden');
+                this.elements[`${type}Gallery`].classList.remove('hidden');
+                this.elements.noMoreOutfits.classList.add('hidden');
+                document.getElementById('back-button-container').classList.remove('hidden');
+                this.updateGallery(type);
+            }
+
+            updateGallery(type) {
+                const container = this.elements[`${type}Container`];
+                container.innerHTML = this[type].map(src => `
+                    <div class="relative aspect-square rounded-xl overflow-hidden cursor-pointer">
+                        <img src="${src}" class="w-full h-full object-cover" 
+                             onclick="curator.openModal('${src}')">
+                    </div>
+                `).join('');
+            }
+
+            openModal(src) {
+                this.elements.modalImage.src = src;
+                this.elements.modal.classList.remove('hidden');
+            }
+
+            closeModal() {
+                this.elements.modal.classList.add('hidden');
+            }
+
+            saveToLocalStorage() {
+                localStorage.setItem('fashionCuratorLiked', JSON.stringify(this.liked));
+                localStorage.setItem('fashionCuratorDisliked', JSON.stringify(this.disliked));
+            }
+
+            showNoMoreOutfits() {
+                this.elements.mainContent.classList.add('hidden');
+                this.elements.noMoreOutfits.classList.remove('hidden');
+                document.getElementById('back-button-container').classList.add('hidden');
+            }
+
+            showMainContent() {
+                this.elements.likedGallery.classList.add('hidden');
+                this.elements.dislikedGallery.classList.add('hidden');
+                this.elements.mainContent.classList.remove('hidden');
+                document.getElementById('back-button-container').classList.add('hidden');
+            }
+
+            restartBrowsing() {
+                this.currentIndex = 0;
+                this.liked = [];
+                this.disliked = [];
+                localStorage.clear();
+                this.showMainContent();
+                this.showCurrentImage();
+                this.updateGallery('liked');
+                this.updateGallery('disliked');
+            }
+        }
+
+        // Initialize the curator
+        const curator = new FashionCurator();
+    </script>
 </body>
 </html>
